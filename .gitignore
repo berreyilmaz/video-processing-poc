@@ -1,0 +1,28 @@
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Video files and generated results
+uploads/
+data/
+*.mp4
+*.mov
+*.avi
+
+# OS and editor
+.DS_Store
+.vscode/
+.idea/
+
+# MinIO AIStor license
+minio.license

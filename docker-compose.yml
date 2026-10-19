@@ -1,0 +1,82 @@
+
+services:
+  mongodb:
+    image: mongo:8
+    container_name: video-poc-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "db.adminCommand('ping').ok"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/aistor/minio:EDGE.2026-10-13T18-50-35Z
+    container_name: video-poc-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001" --license /minio.license
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+      - ${MINIO_LICENSE_FILE}:/minio.license:ro
+
+
+  api:
+    build: .
+    container_name: video-poc-api
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - .env
+    environment:
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MINIO_ENDPOINT: minio:9000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  worker:
+    build: .
+    container_name: video-poc-worker
+    restart: unless-stopped
+    command: ["python", "-m", "worker.worker"]
+    env_file:
+      - .env
+    environment:
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MINIO_ENDPOINT: minio:9000
+      WORKER_ID: worker-1
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+
+volumes:
+  mongodb_data:
+  minio_data:
